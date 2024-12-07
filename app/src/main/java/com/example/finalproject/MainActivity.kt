@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -40,6 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.finalproject.ui.theme.FinalProjectTheme
 import com.example.finalproject.ProjectItem
 
@@ -77,32 +83,65 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FinalProjectTheme {
-                var isDialogOpen by remember { mutableStateOf(false) }
+                val navController = rememberNavController()
                 var projects by remember { mutableStateOf(sampleProjects()) }
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    floatingActionButton = {
-                        AddNewProject(onClick = { isDialogOpen = true })
-                    }
-                ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        ProjectList(
-                            projects = projects
-                        )
-                        if (isDialogOpen) {
-                            AddProjectDialog(
-                                onDismiss = { isDialogOpen = false },
-                                onAddProject = { name, description ->
-                                    if (name.isNotBlank() && description.isNotBlank()) {
-                                        projects = projects + ProjectItem(name, description)
-                                    }
-                                    isDialogOpen = false
+                NavHost(
+                    navController = navController,
+                    startDestination = "home"
+                ) {
+                    composable("home") {
+                        HomeScreen(
+                            projects = projects,
+                            onProjectClick = { project ->
+                                navController.navigate("details/${project.title}/${project.description}")
+                            },
+                            onAddProject = { name, description ->
+                                if (name.isNotBlank() && description.isNotBlank()) {
+                                    projects = projects + ProjectItem(name, description)
                                 }
-                            )
-                        }
+                            }
+                        )
+                    }
+                    composable(
+                        "details/{title}/{description}"
+                    ) { backStackEntry ->
+                        val title = backStackEntry.arguments?.getString("title") ?: ""
+                        val description = backStackEntry.arguments?.getString("description") ?: ""
+                        ProjectDetailsScreen(title = title, description = description)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeScreen(
+    projects: List<ProjectItem>,
+    onProjectClick: (ProjectItem) -> Unit,
+    onAddProject: (String, String) -> Unit
+) {
+    var isDialogOpen by remember { mutableStateOf(false) }
+
+    Scaffold(
+        floatingActionButton = {
+            AddNewProject(onClick = { isDialogOpen = true })
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            ProjectList(
+                projects = projects,
+                onProjectClick = onProjectClick
+            )
+            if (isDialogOpen) {
+                AddProjectDialog(
+                    onDismiss = { isDialogOpen = false },
+                    onAddProject = { name, description ->
+                        onAddProject(name, description)
+                        isDialogOpen = false
+                    }
+                )
             }
         }
     }
@@ -159,12 +198,17 @@ fun HorizontalCardPreview() {
 }
 
 @Composable
-fun ProjectList(projects: List<ProjectItem>, modifier: Modifier = Modifier) {
+fun ProjectList(
+    projects: List<ProjectItem>,
+    onProjectClick: (ProjectItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(modifier = modifier) {
         items(projects) { project ->
             HorizontalCard(
                 title = project.title,
-                description = project.description
+                description = project.description,
+                modifier = Modifier.clickable { onProjectClick(project) }
             )
         }
     }
@@ -174,7 +218,7 @@ fun ProjectList(projects: List<ProjectItem>, modifier: Modifier = Modifier) {
 fun AddNewProject(onClick: () -> Unit) {
     ExtendedFloatingActionButton(
         onClick = { onClick() },
-        icon = { Icon(Icons.Filled.Edit, "New project button") },
+        icon = { Icon(Icons.Filled.Add, "New project button") },
         text = { Text(text = "New project") },
     )
 }
@@ -241,6 +285,27 @@ fun sampleProjects(): List<ProjectItem> {
     )
 }
 
+@Composable
+fun ProjectDetailsScreen(title: String, description: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun ProjectListPreview() {
@@ -256,8 +321,10 @@ fun ProjectListPreview() {
                     ProjectItem("Project 2", "Description 2"),
                     ProjectItem("Project 3", "Description 3")
                 ),
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier.padding(innerPadding),
+                onProjectClick = {} // Pass an empty lambda
             )
         }
     }
 }
+
