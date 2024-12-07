@@ -1,26 +1,43 @@
 package com.example.finalproject
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.finalproject.ui.theme.FinalProjectTheme
@@ -34,7 +51,7 @@ import com.example.finalproject.ProjectItem
 //         DONE -- Title
 //         DONE -- Description
 //         Two backgrounds / overlay
-//      FAB to make new task project
+//      DONE -- FAB to make new task project
 //      New task popup
 //          “Add New Project”
 //          Name field
@@ -44,7 +61,7 @@ import com.example.finalproject.ProjectItem
 //  Home - State
 //      Project card
 //          Image will be chosen randomly
-//          Needs to be clickable
+//          Needs to be clickable and take you to the task page
 //      State for progress ticking down (change background width)
 //      FAB
 //          Clicking opens Add New Project popup
@@ -60,15 +77,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FinalProjectTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ProjectList(
-                        projects = listOf(
-                            ProjectItem("Project 1", "Description 1"),
-                            ProjectItem("Project 2", "Description 2"),
-                            ProjectItem("Project 3", "Description 3")
-                        ),
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                var isDialogOpen by remember { mutableStateOf(false) }
+                var projects by remember { mutableStateOf(sampleProjects()) }
+
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    floatingActionButton = {
+                        AddNewProject(onClick = { isDialogOpen = true })
+                    }
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        ProjectList(
+                            projects = projects
+                        )
+                        if (isDialogOpen) {
+                            AddProjectDialog(
+                                onDismiss = { isDialogOpen = false },
+                                onAddProject = { name, description ->
+                                    if (name.isNotBlank() && description.isNotBlank()) {
+                                        projects = projects + ProjectItem(name, description)
+                                    }
+                                    isDialogOpen = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -137,16 +170,94 @@ fun ProjectList(projects: List<ProjectItem>, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+fun AddNewProject(onClick: () -> Unit) {
+    ExtendedFloatingActionButton(
+        onClick = { onClick() },
+        icon = { Icon(Icons.Filled.Edit, "New project button") },
+        text = { Text(text = "New project") },
+    )
+}
+
+@Composable
+fun AddProjectDialog(
+    onDismiss: () -> Unit,
+    onAddProject: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(TextFieldValue("")) }
+    var description by remember { mutableStateOf(TextFieldValue("")) }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = { Text(text = "Add New Project") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(text = "Name") },
+                    trailingIcon = {
+                        IconButton(onClick = { name = TextFieldValue("") }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear name")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(text = "Description") },
+                    trailingIcon = {
+                        IconButton(onClick = { description = TextFieldValue("") }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear description")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onAddProject(name.text, description.text)
+            }) {
+                Text(text = "Add Project")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text(text = "Cancel")
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+fun sampleProjects(): List<ProjectItem> {
+    return listOf(
+        ProjectItem("Project 1", "Description 1"),
+        ProjectItem("Project 2", "Description 2"),
+        ProjectItem("Project 3", "Description 3")
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 fun ProjectListPreview() {
     FinalProjectTheme {
-        ProjectList(
-            projects = listOf(
-                ProjectItem("Project 1", "Description 1"),
-                ProjectItem("Project 2", "Description 2"),
-                ProjectItem("Project 3", "Description 3")
+        Scaffold(
+            floatingActionButton = {
+                AddNewProject(onClick = {})
+            }
+        ) { innerPadding ->
+            ProjectList(
+                projects = listOf(
+                    ProjectItem("Project 1", "Description 1"),
+                    ProjectItem("Project 2", "Description 2"),
+                    ProjectItem("Project 3", "Description 3")
+                ),
+                modifier = Modifier.padding(innerPadding)
             )
-        )
+        }
     }
 }
