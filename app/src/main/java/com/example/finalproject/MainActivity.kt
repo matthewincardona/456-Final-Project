@@ -1,5 +1,6 @@
 package com.example.finalproject
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,13 +38,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.finalproject.ui.theme.FinalProjectTheme
-import android.app.Activity
 import android.content.Intent
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
@@ -51,12 +50,16 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.api.services.calendar.CalendarScopes
 import com.google.android.gms.common.api.Scope
+import kotlinx.coroutines.delay
 
 const val REQUEST_AUTHORIZATION = 1001
 
@@ -65,10 +68,10 @@ const val REQUEST_AUTHORIZATION = 1001
 //  Home - UI
 //      Project card
 //         Image
-//         DONE -- Title
-//         DONE -- Description
+//         Title
+//         Description
 //         Two backgrounds / overlay
-//      DONE -- FAB to make new task project
+//      FAB to make new task project
 //      New task popup
 //          “Add New Project”
 //          Name field
@@ -77,7 +80,6 @@ const val REQUEST_AUTHORIZATION = 1001
 //
 //  Home - State
 //      Project card
-//          Image will be chosen randomly
 //          Needs to be clickable and take you to the task page
 //      State for progress ticking down (change background width)
 //      FAB
@@ -99,7 +101,7 @@ class MainActivity : ComponentActivity() {
         // Initialize the ActivityResultLauncher
         authorizationLauncher =
             registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                if (result.resultCode == Activity.RESULT_OK) {
+                if (result.resultCode == RESULT_OK) {
                     Log.d("MainActivity", "Authorization successful!")
                     // Handle success, e.g., fetch data from Google Calendar API
                 } else {
@@ -111,12 +113,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             FinalProjectTheme {
                 val navController = rememberNavController()
-                var projects by remember { mutableStateOf(sampleProjects()) }
+                var projects by remember {
+                    mutableStateOf(StorageHelper.loadProjects(this)) // Load saved projects on startup
+                }
 
-                NavHost(
-                    navController = navController,
-                    startDestination = "home"
-                ) {
+                // Observe changes and save to local storage
+                LaunchedEffect(projects) {
+                    StorageHelper.saveProjects(this@MainActivity, projects)
+                }
+
+                NavHost(navController = navController, startDestination = "home") {
                     composable("home") {
                         HomeScreen(
                             projects = projects,
@@ -134,8 +140,7 @@ class MainActivity : ComponentActivity() {
                     composable("details/{title}/{description}") { backStackEntry ->
                         val title = backStackEntry.arguments?.getString("title") ?: ""
                         val description = backStackEntry.arguments?.getString("description") ?: ""
-                        val project =
-                            projects.find { it.title == title && it.description == description }
+                        val project = projects.find { it.title == title && it.description == description }
 
                         if (project != null) {
                             ProjectDetailsScreen(
@@ -187,25 +192,21 @@ class MainActivity : ComponentActivity() {
         val authorizationResult = Identity.getAuthorizationClient(this)
             .getAuthorizationResultFromIntent(data)
 
-        if (authorizationResult != null) {
-            if (authorizationResult.hasResolution()) {
-                // Authorization still needs user interaction
-                Log.d("MainActivity", "Authorization requires user interaction.")
-            } else {
-                // Check for granted scopes
-                val grantedScopes = authorizationResult.grantedScopes
-                if (grantedScopes != null && grantedScopes.isNotEmpty()) {
-                    Log.d(
-                        "MainActivity",
-                        "Authorization successful! Granted scopes: $grantedScopes"
-                    )
-                    saveToCalendar()
-                } else {
-                    Log.e("MainActivity", "Authorization failed: No granted scopes.")
-                }
-            }
+        if (authorizationResult.hasResolution()) {
+            // Authorization still needs user interaction
+            Log.d("MainActivity", "Authorization requires user interaction.")
         } else {
-            Log.e("MainActivity", "Authorization result is null or invalid.")
+            // Check for granted scopes
+            val grantedScopes = authorizationResult.grantedScopes
+            if (grantedScopes.isNotEmpty()) {
+                Log.d(
+                    "MainActivity",
+                    "Authorization successful! Granted scopes: $grantedScopes"
+                )
+                saveToCalendar()
+            } else {
+                Log.e("MainActivity", "Authorization failed: No granted scopes.")
+            }
         }
     }
 
@@ -258,54 +259,52 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun HorizontalCard(title: String, description: String, modifier: Modifier = Modifier) {
+    fun HorizontalCard(
+        title: String,
+        description: String,
+        progress: Float, // Add progress as a parameter
+        modifier: Modifier = Modifier
+    ) {
         Card(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(8.dp),
             shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 4.dp
-            )
+            elevation = CardDefaults.cardElevation(4.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Title and description
-                Column(
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                // ProgressBar
+                LinearProgressIndicator(
+                    progress = { progress },
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.padding(4.dp))
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }
 
-    @Preview(showBackground = true)
-    @Composable
-    fun HorizontalCardPreview() {
-        FinalProjectTheme {
-            HorizontalCard(
-                title = "Card Title",
-                description = "Card description"
-            )
-        }
-    }
+//    @Preview(showBackground = true)
+//    @Composable
+//    fun HorizontalCardPreview() {
+//        FinalProjectTheme {
+//            HorizontalCard(
+//                title = "Card Title",
+//                description = "Card description"
+//            )
+//        }
+//    }
 
     @Composable
     fun ProjectList(
@@ -315,14 +314,27 @@ class MainActivity : ComponentActivity() {
     ) {
         LazyColumn(modifier = modifier) {
             items(projects) { project ->
+                // Simulate the progress ticking down every second
+                var progress by remember { mutableFloatStateOf(project.progress) }
+
+                // Reduce progress over time
+                LaunchedEffect(Unit) {
+                    while (progress > 0f) {
+                        delay(1000L) // Decrease progress every second
+                        progress -= 0.01f // Decrease by a small amount
+                    }
+                }
+
                 HorizontalCard(
                     title = project.title,
                     description = project.description,
+                    progress = progress, // Pass progress value
                     modifier = Modifier.clickable { onProjectClick(project) }
                 )
             }
         }
     }
+
 
     @Composable
     fun AddNewProject(onClick: () -> Unit) {
@@ -387,21 +399,16 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun sampleProjects(): List<ProjectItem> {
-        return listOf(
-            ProjectItem("Project 1", "Description 1"),
-            ProjectItem("Project 2", "Description 2"),
-            ProjectItem("Project 3", "Description 3")
-        )
-    }
-
+    @SuppressLint("MutableCollectionMutableState")
     @Composable
     fun ProjectDetailsScreen(
         project: ProjectItem,
         onUpdateProject: (ProjectItem) -> Unit
     ) {
+        val context = LocalContext.current
+        var tasks by remember { mutableStateOf(StorageHelper.loadTasks(context, project.title)) }
+        var progress by remember { mutableFloatStateOf(project.progress) }
         var isDialogOpen by remember { mutableStateOf(false) }
-        var tasks by remember { mutableStateOf(project.tasks.toMutableList()) } // Initialize tasks from the project
 
         Scaffold(
             floatingActionButton = {
@@ -430,6 +437,17 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
+                // Progress bar
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Tasks Section
                 Text(
                     text = "Tasks:",
@@ -437,6 +455,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
 
+                // Tasks Section
                 if (tasks.isEmpty()) {
                     Text("No tasks added yet.")
                 } else {
@@ -445,12 +464,15 @@ class MainActivity : ComponentActivity() {
                             TaskCard(
                                 task = task,
                                 onToggleCompletion = {
-                                    val updatedTask = task.copy(completed = !task.completed) // Toggle completion
-                                    val updatedTasks = tasks.map { existingTask ->
-                                        if (existingTask == task) updatedTask else existingTask
+                                    val updatedTask = task.copy(completed = !task.completed)
+                                    tasks = tasks.map {
+                                        if (it == task) updatedTask else it
                                     }
-                                    tasks = updatedTasks.toMutableList()
-                                    onUpdateProject(project.copy(tasks = updatedTasks)) // Save changes to project
+                                    StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
+                                    if (updatedTask.completed) {
+                                        progress = minOf(1f, progress + 0.1f)
+                                    }
+                                    onUpdateProject(project.withProgress(progress))
                                 }
                             )
                         }
@@ -458,23 +480,33 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Dialog for Adding Tasks
+            // Add Task Dialog
             if (isDialogOpen) {
                 AddTaskDialog(
                     onDismiss = { isDialogOpen = false },
                     onAddTask = { taskTitle, taskDescription ->
                         if (taskTitle.isNotBlank() && taskDescription.isNotBlank()) {
                             val newTask = TaskItem(taskTitle, taskDescription)
-                            tasks = tasks.toMutableList().apply { add(newTask) }
-                            onUpdateProject(project.copy(tasks = tasks)) // Save updated task list to project
+                            tasks = tasks + newTask
+                            StorageHelper.saveTasks(context, project.title, tasks) // Save tasks after addition
+                            onUpdateProject(project.copy(tasks = tasks))
                         }
                         isDialogOpen = false
                     }
                 )
             }
         }
-    }
 
+        // Simulate the progress ticking down every second
+        LaunchedEffect(Unit) {
+            while (progress > 0f) {
+                delay(1000L) // Decrease progress every second
+                progress -= 0.01f // Decrease by a small amount
+                val updatedProject = project.withProgress(progress) // Update project with new progress
+                onUpdateProject(updatedProject)
+            }
+        }
+    }
 
 
     @Composable
@@ -519,7 +551,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-
     @Composable
     fun TaskCard(
         task: TaskItem,
@@ -550,6 +581,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
         //    @Preview(showBackground = true)
         @Composable
         fun ProjectListPreview() {
@@ -572,3 +604,21 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+//@Composable
+//fun ProjectList(
+//    projects: List<ProjectItem>,
+//    onProjectClick: (ProjectItem) -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    LazyColumn(modifier = modifier) {
+//        items(projects) { project ->
+//            HorizontalCard(
+//                title = project.title,
+//                description = project.description,
+//                modifier = Modifier.clickable { onProjectClick(project) }
+//            )
+//        }
+//    }
+//}
+

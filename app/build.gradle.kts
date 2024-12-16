@@ -62,7 +62,8 @@ android {
     }
 
     dependencies {
-        implementation("com.google.android.gms:play-services-auth:20.7.0")
+        implementation("com.google.code.gson:gson:2.11.0")
+        implementation(libs.play.services.auth)
         implementation("com.google.api-client:google-api-client:2.7.1")
         implementation("com.google.oauth-client:google-oauth-client-jetty:1.36.0")
         implementation (libs.play.services.auth.v2101)
