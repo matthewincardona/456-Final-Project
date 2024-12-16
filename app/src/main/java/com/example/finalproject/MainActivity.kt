@@ -94,13 +94,11 @@ const val REQUEST_AUTHORIZATION = 1001
 
 class MainActivity : ComponentActivity() {
 
-    // ActivityResultLauncher for handling the authorization result
     private lateinit var authorizationLauncher: ActivityResultLauncher<IntentSenderRequest>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize the ActivityResultLauncher
         authorizationLauncher =
             registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
                 if (result.resultCode == RESULT_OK) {
@@ -119,7 +117,6 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(StorageHelper.loadProjects(this)) // Load saved projects on startup
                 }
 
-                // Observe changes and save to local storage
                 LaunchedEffect(projects) {
                     StorageHelper.saveProjects(this@MainActivity, projects)
                 }
@@ -160,7 +157,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Function to request Google Calendar authorization
+    // request Google calendar authorization
     private fun requestGoogleCalendarAuthorization() {
         val requestedScopes = listOf(Scope(CalendarScopes.CALENDAR_READONLY))
 
@@ -179,7 +176,7 @@ class MainActivity : ComponentActivity() {
                         authorizationLauncher.launch(intentSenderRequest)
                     }
                 } else {
-                    // Access already granted
+                    // if access is already granted
                     Log.d("MainActivity", "Authorization already granted.")
                     saveToCalendar()
                 }
@@ -189,7 +186,6 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    // Handle Authorization Result
     private fun handleAuthorizationResult(data: Intent) {
         val authorizationResult = Identity.getAuthorizationClient(this)
             .getAuthorizationResultFromIntent(data)
@@ -214,7 +210,7 @@ class MainActivity : ComponentActivity() {
 
     private fun saveToCalendar() {
         Log.d("MainActivity", "Ready to access Google Calendar API.")
-        // Call your Google Calendar API logic here
+        // TO DO: add Google calendar api logic
     }
 
     @Composable
@@ -228,10 +224,10 @@ class MainActivity : ComponentActivity() {
 
         Scaffold(
             topBar = {
-                // Button to trigger Google Calendar Authorization
+                // button to trigger Google Calendar Authorization (if it worked)
                 Box(modifier = Modifier.padding(top = 48.dp, start = 8.dp, end = 8.dp, bottom = 8.dp)) {
                     TextButton(
-                        onClick = { onAuthorize() },  // Trigger authorization
+                        onClick = { onAuthorize() },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(text = "Connect Google Calendar")
@@ -274,20 +270,20 @@ class MainActivity : ComponentActivity() {
             shape = RoundedCornerShape(8.dp),
             elevation = CardDefaults.cardElevation(4.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF333333) // Set the background to #333333
+                containerColor = Color(0xFF333333)
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White // Make the text white for better contrast
+                    color = Color.White
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.LightGray // Use light gray for secondary text
+                    color = Color.LightGray
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
@@ -295,7 +291,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
-                    color = if (progress <= 0.2f) Color.Red else Color.Green, // Red when progress is low
+                    color = if (progress <= 0.2f) Color.Red else Color.Green, // red when progress is low, green otherwise
                 )
             }
         }
@@ -310,21 +306,19 @@ class MainActivity : ComponentActivity() {
     ) {
         LazyColumn(modifier = modifier) {
             items(projects) { project ->
-                // Simulate the progress ticking down every second
                 var progress by remember { mutableFloatStateOf(project.progress) }
 
-                // Reduce progress over time
                 LaunchedEffect(Unit) {
                     while (progress > 0f) {
-                        delay(1000L) // Decrease progress every second
-                        progress -= 0.01f // Decrease by a small amount
+                        delay(1000L) // decay progress every second
+                        progress -= 0.01f
                     }
                 }
 
                 HorizontalCard(
                     title = project.title,
                     description = project.description,
-                    progress = progress, // Pass progress value
+                    progress = progress,
                     modifier = Modifier.clickable { onProjectClick(project) }
                 )
             }
@@ -407,11 +401,10 @@ class MainActivity : ComponentActivity() {
         var progress by remember { mutableFloatStateOf(project.progress) }
         var isDialogOpen by remember { mutableStateOf(false) }
 
-        // Track the timer state and elapsed time
+        // track the timer
         LaunchedEffect(tasks) {
-            // Update elapsed time for tasks that are running the timer
             while (tasks.any { it.timerRunning }) {
-                delay(1000L) // Update every second
+                delay(1000L) // update every second
                 tasks = tasks.map { task ->
                     if (task.timerRunning) {
                         val elapsedTime = System.currentTimeMillis() - task.startTime + task.elapsedTime
@@ -420,8 +413,8 @@ class MainActivity : ComponentActivity() {
                         task
                     }
                 }.toMutableList()
-                StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
-                onUpdateProject(project.copy(tasks = tasks)) // Update the project with the new task state
+                StorageHelper.saveTasks(context, project.title, tasks) // save updated tasks
+                onUpdateProject(project.copy(tasks = tasks)) // update project with state
             }
         }
 
@@ -441,7 +434,6 @@ class MainActivity : ComponentActivity() {
                     .padding(paddingValues)
                     .padding(16.dp)
             ) {
-                // Project Title and Description
                 Text(
                     text = project.title,
                     style = MaterialTheme.typography.titleLarge,
@@ -453,25 +445,22 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // Progress bar
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
-                    color = if (progress <= 0.2f) Color.Red else Color.Green, // Red when progress is low
+                    color = if (progress <= 0.2f) Color.Red else Color.Green, // Red when progress is low, green otherwise
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Tasks Section
                 Text(
                     text = "Tasks:",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
 
-                // Tasks Section
                 if (tasks.isEmpty()) {
                     Text("No tasks added yet.")
                 } else {
@@ -485,29 +474,37 @@ class MainActivity : ComponentActivity() {
                                         if (it == task) updatedTask else it
                                     }
                                     StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
+
                                     if (updatedTask.completed) {
-                                        progress = minOf(1f, progress + 0.1f)
+                                        // calculate task duration (in seconds)
+                                        val taskDurationSeconds = updatedTask.elapsedTime / 1000f
+                                        val progressIncrement = (taskDurationSeconds / 3600f) * 10f
+                                        progress = minOf(1f, progress + progressIncrement)
                                     }
                                     onUpdateProject(project.withProgress(progress))
                                 },
                                 onToggleTimer = { task ->
-                                    // Toggle the timer for the task
-                                    tasks = tasks.map { currentTask ->
-                                        if (currentTask == task) {
-                                            if (currentTask.timerRunning) {
-                                                // Stop the timer
-                                                val elapsedTime = System.currentTimeMillis() - currentTask.startTime + currentTask.elapsedTime
-                                                currentTask.copy(timerRunning = false, elapsedTime = elapsedTime)
+                                    val currentTime = System.currentTimeMillis()
+
+                                    tasks = tasks.map {
+                                        if (it == task) {
+                                            val updatedElapsedTime = if (!task.timerRunning) {
+                                                task.elapsedTime
                                             } else {
-                                                // Start the timer
-                                                currentTask.copy(timerRunning = true, startTime = System.currentTimeMillis())
+                                                task.elapsedTime + (currentTime - task.startTime)
                                             }
+
+                                            task.copy(
+                                                timerRunning = !task.timerRunning,
+                                                startTime = if (!task.timerRunning) currentTime else task.startTime,
+                                                elapsedTime = if (!task.timerRunning) updatedElapsedTime else task.elapsedTime
+                                            )
                                         } else {
-                                            currentTask
+                                            it
                                         }
-                                    }.toMutableList()
-                                    StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
-                                    onUpdateProject(project.copy(tasks = tasks)) // Update project with new tasks
+                                    }
+                                    StorageHelper.saveTasks(context, project.title, tasks)
+                                    onUpdateProject(project.copy(tasks = tasks))
                                 }
                             )
                         }
@@ -515,7 +512,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Handling Timer Toggle
+            // handling timer toggle
             fun toggleTimer(task: TaskItem) {
                 tasks = tasks.map { currentTask ->
                     if (currentTask == task) {
@@ -529,8 +526,8 @@ class MainActivity : ComponentActivity() {
                         currentTask
                     }
                 }.toMutableList()
-                StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
-                onUpdateProject(project.copy(tasks = tasks)) // Update project with new tasks
+                StorageHelper.saveTasks(context, project.title, tasks)
+                onUpdateProject(project.copy(tasks = tasks))
             }
 
             // Add Task Dialog
@@ -541,7 +538,7 @@ class MainActivity : ComponentActivity() {
                         if (taskTitle.isNotBlank() && taskDescription.isNotBlank()) {
                             val newTask = TaskItem(taskTitle, taskDescription)
                             tasks = tasks + newTask
-                            StorageHelper.saveTasks(context, project.title, tasks) // Save tasks after addition
+                            StorageHelper.saveTasks(context, project.title, tasks) // save tasks after adding more
                             onUpdateProject(project.copy(tasks = tasks))
                         }
                         isDialogOpen = false
@@ -550,12 +547,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Simulate the progress ticking down every second
         LaunchedEffect(Unit) {
             while (progress > 0f) {
-                delay(1000L) // Decrease progress every second
-                progress -= 0.01f // Decrease by a small amount
-                val updatedProject = project.withProgress(progress) // Update project with new progress
+                delay(1000L) // decay progress every second
+                progress -= 0.01f
+                val updatedProject = project.withProgress(progress) // update project with new progress
                 onUpdateProject(updatedProject)
             }
         }
@@ -610,10 +606,10 @@ class MainActivity : ComponentActivity() {
         onToggleCompletion: () -> Unit,
         onToggleTimer: (TaskItem) -> Unit
     ) {
-        // Format the elapsed time into hours, minutes, and seconds
-        val hours = (task.elapsedTime / 3600).toInt()
-        val minutes = ((task.elapsedTime % 3600) / 60).toInt()
-        val seconds = (task.elapsedTime % 60).toInt()
+        // time conversions
+        val hours = (task.elapsedTime / 3600000).toInt()
+        val minutes = ((task.elapsedTime % 3600000) / 60000).toInt()
+        val seconds = ((task.elapsedTime % 60000) / 1000).toInt()
 
         Row(
             modifier = Modifier
@@ -639,7 +635,7 @@ class MainActivity : ComponentActivity() {
             )
             Spacer(modifier = Modifier.weight(1f))
 
-            // Display elapsed time in the format HH:MM:SS
+            // display elapsed time in the format HH:MM:SS
             Text(
                 text = String.format("%02d:%02d:%02d", hours, minutes, seconds),
                 style = MaterialTheme.typography.bodySmall,
