@@ -53,6 +53,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
@@ -227,7 +228,7 @@ class MainActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 // Button to trigger Google Calendar Authorization
-                Box(modifier = Modifier.padding(8.dp)) {
+                Box(modifier = Modifier.padding(top = 40.dp, start = 8.dp, end = 8.dp, bottom = 8.dp)) {
                     TextButton(
                         onClick = { onAuthorize() },  // Trigger authorization
                         modifier = Modifier.fillMaxWidth()
@@ -262,7 +263,7 @@ class MainActivity : ComponentActivity() {
     fun HorizontalCard(
         title: String,
         description: String,
-        progress: Float, // Add progress as a parameter
+        progress: Float,
         modifier: Modifier = Modifier
     ) {
         Card(
@@ -270,41 +271,35 @@ class MainActivity : ComponentActivity() {
                 .fillMaxWidth()
                 .padding(8.dp),
             shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(4.dp)
+            elevation = CardDefaults.cardElevation(4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF333333) // Set the background to #333333
+            )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White // Make the text white for better contrast
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.LightGray // Use light gray for secondary text
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                // ProgressBar
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (progress <= 0.2f) Color.Red else Color.Green, // Red when progress is low
                 )
             }
         }
     }
 
-//    @Preview(showBackground = true)
-//    @Composable
-//    fun HorizontalCardPreview() {
-//        FinalProjectTheme {
-//            HorizontalCard(
-//                title = "Card Title",
-//                description = "Card description"
-//            )
-//        }
-//    }
 
     @Composable
     fun ProjectList(
@@ -340,8 +335,9 @@ class MainActivity : ComponentActivity() {
     fun AddNewProject(onClick: () -> Unit) {
         ExtendedFloatingActionButton(
             onClick = { onClick() },
-            icon = { Icon(Icons.Filled.Add, "New project button") },
-            text = { Text(text = "New project") },
+            icon = { Icon(Icons.Filled.Add, "New Project", tint = Color.White) },
+            text = { Text(text = "New Project", color = Color.White) },
+            containerColor = Color.Blue, // Accent color for FAB
         )
     }
 
@@ -414,8 +410,9 @@ class MainActivity : ComponentActivity() {
             floatingActionButton = {
                 ExtendedFloatingActionButton(
                     onClick = { isDialogOpen = true },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = "Add Task") },
-                    text = { Text("Add Task") }
+                    icon = { Icon(Icons.Filled.Add, "Add Task", tint = Color.White) },
+                    text = { Text(text = "Add Task", color = Color.White) },
+                    containerColor = Color.Blue, // Accent color for FAB
                 )
             }
         ) { paddingValues ->
@@ -443,7 +440,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (progress <= 0.2f) Color.Red else Color.Green, // Red when progress is low
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
