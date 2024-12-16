@@ -3,7 +3,10 @@ package com.example.finalproject
 data class TaskItem(
     val title: String,
     val description: String,
-    val completed: Boolean = false
+    var completed: Boolean = false,
+    var timerRunning: Boolean = false,  // Flag to track if the timer is running
+    var startTime: Long = 0L,           // Start time to track elapsed time
+    var elapsedTime: Long = 0L          // Elapsed time
 )
 
 data class ProjectItem(

@@ -49,6 +49,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
@@ -228,7 +229,7 @@ class MainActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 // Button to trigger Google Calendar Authorization
-                Box(modifier = Modifier.padding(top = 40.dp, start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+                Box(modifier = Modifier.padding(top = 48.dp, start = 8.dp, end = 8.dp, bottom = 8.dp)) {
                     TextButton(
                         onClick = { onAuthorize() },  // Trigger authorization
                         modifier = Modifier.fillMaxWidth()
@@ -406,6 +407,24 @@ class MainActivity : ComponentActivity() {
         var progress by remember { mutableFloatStateOf(project.progress) }
         var isDialogOpen by remember { mutableStateOf(false) }
 
+        // Track the timer state and elapsed time
+        LaunchedEffect(tasks) {
+            // Update elapsed time for tasks that are running the timer
+            while (tasks.any { it.timerRunning }) {
+                delay(1000L) // Update every second
+                tasks = tasks.map { task ->
+                    if (task.timerRunning) {
+                        val elapsedTime = System.currentTimeMillis() - task.startTime + task.elapsedTime
+                        task.copy(elapsedTime = elapsedTime)
+                    } else {
+                        task
+                    }
+                }.toMutableList()
+                StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
+                onUpdateProject(project.copy(tasks = tasks)) // Update the project with the new task state
+            }
+        }
+
         Scaffold(
             floatingActionButton = {
                 ExtendedFloatingActionButton(
@@ -470,11 +489,48 @@ class MainActivity : ComponentActivity() {
                                         progress = minOf(1f, progress + 0.1f)
                                     }
                                     onUpdateProject(project.withProgress(progress))
+                                },
+                                onToggleTimer = { task ->
+                                    // Toggle the timer for the task
+                                    tasks = tasks.map { currentTask ->
+                                        if (currentTask == task) {
+                                            if (currentTask.timerRunning) {
+                                                // Stop the timer
+                                                val elapsedTime = System.currentTimeMillis() - currentTask.startTime + currentTask.elapsedTime
+                                                currentTask.copy(timerRunning = false, elapsedTime = elapsedTime)
+                                            } else {
+                                                // Start the timer
+                                                currentTask.copy(timerRunning = true, startTime = System.currentTimeMillis())
+                                            }
+                                        } else {
+                                            currentTask
+                                        }
+                                    }.toMutableList()
+                                    StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
+                                    onUpdateProject(project.copy(tasks = tasks)) // Update project with new tasks
                                 }
                             )
                         }
                     }
                 }
+            }
+
+            // Handling Timer Toggle
+            fun toggleTimer(task: TaskItem) {
+                tasks = tasks.map { currentTask ->
+                    if (currentTask == task) {
+                        if (currentTask.timerRunning) {
+                            val elapsedTime = System.currentTimeMillis() - currentTask.startTime + currentTask.elapsedTime
+                            currentTask.copy(timerRunning = false, elapsedTime = elapsedTime)
+                        } else {
+                            currentTask.copy(timerRunning = true, startTime = System.currentTimeMillis())
+                        }
+                    } else {
+                        currentTask
+                    }
+                }.toMutableList()
+                StorageHelper.saveTasks(context, project.title, tasks) // Save updated tasks
+                onUpdateProject(project.copy(tasks = tasks)) // Update project with new tasks
             }
 
             // Add Task Dialog
@@ -551,8 +607,14 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun TaskCard(
         task: TaskItem,
-        onToggleCompletion: () -> Unit
+        onToggleCompletion: () -> Unit,
+        onToggleTimer: (TaskItem) -> Unit
     ) {
+        // Format the elapsed time into hours, minutes, and seconds
+        val hours = (task.elapsedTime / 3600).toInt()
+        val minutes = ((task.elapsedTime % 3600) / 60).toInt()
+        val seconds = (task.elapsedTime % 60).toInt()
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -575,11 +637,27 @@ class MainActivity : ComponentActivity() {
                 },
                 modifier = Modifier.padding(start = 8.dp)
             )
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Display elapsed time in the format HH:MM:SS
+            Text(
+                text = String.format("%02d:%02d:%02d", hours, minutes, seconds),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+
+            // Play/Stop button to toggle the timer
+            IconButton(onClick = { onToggleTimer(task) }) {
+                Icon(
+                    imageVector = if (task.timerRunning) Icons.Filled.Close else Icons.Filled.PlayArrow,
+                    contentDescription = if (task.timerRunning) "Stop Timer" else "Start Timer"
+                )
+            }
         }
     }
 
 
-        //    @Preview(showBackground = true)
+    //    @Preview(showBackground = true)
         @Composable
         fun ProjectListPreview() {
             FinalProjectTheme {
