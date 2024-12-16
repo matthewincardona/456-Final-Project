@@ -1,12 +1,10 @@
 package com.example.finalproject
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,14 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -41,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -49,16 +43,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.finalproject.ui.theme.FinalProjectTheme
-import com.example.finalproject.ProjectItem
 import android.app.Activity
-import android.app.PendingIntent
 import android.content.Intent
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDecoration
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
-import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.api.services.calendar.CalendarScopes
 import com.google.android.gms.common.api.Scope
@@ -136,12 +131,22 @@ class MainActivity : ComponentActivity() {
                             onAuthorize = { requestGoogleCalendarAuthorization() }
                         )
                     }
-                    composable(
-                        "details/{title}/{description}"
-                    ) { backStackEntry ->
+                    composable("details/{title}/{description}") { backStackEntry ->
                         val title = backStackEntry.arguments?.getString("title") ?: ""
                         val description = backStackEntry.arguments?.getString("description") ?: ""
-                        ProjectDetailsScreen(title = title, description = description)
+                        val project =
+                            projects.find { it.title == title && it.description == description }
+
+                        if (project != null) {
+                            ProjectDetailsScreen(
+                                project = project,
+                                onUpdateProject = { updatedProject ->
+                                    projects = projects.map {
+                                        if (it.title == updatedProject.title && it.description == updatedProject.description) updatedProject else it
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -391,45 +396,179 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun ProjectDetailsScreen(title: String, description: String) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
+    fun ProjectDetailsScreen(
+        project: ProjectItem,
+        onUpdateProject: (ProjectItem) -> Unit
+    ) {
+        var isDialogOpen by remember { mutableStateOf(false) }
+        var tasks by remember { mutableStateOf(project.tasks.toMutableList()) } // Initialize tasks from the project
 
-    @Preview(showBackground = true)
-    @Composable
-    fun ProjectListPreview() {
-        FinalProjectTheme {
-            Scaffold(
-                floatingActionButton = {
-                    AddNewProject(onClick = {})
+        Scaffold(
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { isDialogOpen = true },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = "Add Task") },
+                    text = { Text("Add Task") }
+                )
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+            ) {
+                // Project Title and Description
+                Text(
+                    text = project.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = project.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Tasks Section
+                Text(
+                    text = "Tasks:",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                if (tasks.isEmpty()) {
+                    Text("No tasks added yet.")
+                } else {
+                    LazyColumn {
+                        items(tasks) { task ->
+                            TaskCard(
+                                task = task,
+                                onToggleCompletion = {
+                                    val updatedTask = task.copy(completed = !task.completed) // Toggle completion
+                                    val updatedTasks = tasks.map { existingTask ->
+                                        if (existingTask == task) updatedTask else existingTask
+                                    }
+                                    tasks = updatedTasks.toMutableList()
+                                    onUpdateProject(project.copy(tasks = updatedTasks)) // Save changes to project
+                                }
+                            )
+                        }
+                    }
                 }
-            ) { innerPadding ->
-                ProjectList(
-                    projects = listOf(
-                        ProjectItem("Project 1", "Description 1"),
-                        ProjectItem("Project 2", "Description 2"),
-                        ProjectItem("Project 3", "Description 3")
-                    ),
-                    modifier = Modifier.padding(innerPadding),
-                    onProjectClick = {} // Pass an empty lambda
+            }
+
+            // Dialog for Adding Tasks
+            if (isDialogOpen) {
+                AddTaskDialog(
+                    onDismiss = { isDialogOpen = false },
+                    onAddTask = { taskTitle, taskDescription ->
+                        if (taskTitle.isNotBlank() && taskDescription.isNotBlank()) {
+                            val newTask = TaskItem(taskTitle, taskDescription)
+                            tasks = tasks.toMutableList().apply { add(newTask) }
+                            onUpdateProject(project.copy(tasks = tasks)) // Save updated task list to project
+                        }
+                        isDialogOpen = false
+                    }
                 )
             }
         }
     }
-}
+
+
+
+    @Composable
+    fun AddTaskDialog(
+        onDismiss: () -> Unit,
+        onAddTask: (String, String) -> Unit
+    ) {
+        var title by remember { mutableStateOf("") }
+        var description by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Add New Task") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Task Title") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Task Description") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAddTask(title, description)
+                }) {
+                    Text("Add Task")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+
+    @Composable
+    fun TaskCard(
+        task: TaskItem,
+        onToggleCompletion: () -> Unit
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .clickable { onToggleCompletion() },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = task.completed,
+                onCheckedChange = { onToggleCompletion() }
+            )
+            Text(
+                text = task.title,
+                style = if (task.completed) {
+                    MaterialTheme.typography.bodyMedium.copy(
+                        textDecoration = TextDecoration.LineThrough
+                    )
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+    }
+
+        //    @Preview(showBackground = true)
+        @Composable
+        fun ProjectListPreview() {
+            FinalProjectTheme {
+                Scaffold(
+                    floatingActionButton = {
+                        AddNewProject(onClick = {})
+                    }
+                ) { innerPadding ->
+                    ProjectList(
+                        projects = listOf(
+                            ProjectItem("Project 1", "Description 1"),
+                            ProjectItem("Project 2", "Description 2"),
+                            ProjectItem("Project 3", "Description 3")
+                        ),
+                        modifier = Modifier.padding(innerPadding),
+                        onProjectClick = {} // Pass an empty lambda
+                    )
+                }
+            }
+        }
+    }
